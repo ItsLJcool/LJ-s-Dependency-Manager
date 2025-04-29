@@ -15,7 +15,7 @@ import funkin.backend.MusicBeatSubstate;
 import haxe.io.Path;
 
 // this just sits here looking pretty, but I'd put this in your Main mod's GlobalScript, so it can access this function if you disable the Dependency's `global.hx` script.
-static var _dlcAddons:Array<String> = [];
+static var _dependsLoaded:Array<String> = [];
 
 var __disableLogging:Bool = false;
 
