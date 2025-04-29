@@ -51,7 +51,7 @@ function new() {
             var dependencyName = Paths.getPath(path + "/.enabled");
             if (!Assets.exists(dependencyName)) dependencyName = StringTools.trim(directory); // backup ig
             else dependencyName = StringTools.trim(Assets.getText(dependencyName));
-            _dlcAddons.push({
+            _dependsLoaded.push({
                 dlcName: dependencyName,
                 folderName: directory,
             });
