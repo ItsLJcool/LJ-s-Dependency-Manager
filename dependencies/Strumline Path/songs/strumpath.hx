@@ -37,7 +37,9 @@ function postCreate() {
 
     __strumDrawnLines.camera = camHUD;
     insert(members.indexOf(strumLines), __strumDrawnLines);
-    __strumDrawnLines.alpha = 0.25;
+    __strumDrawnLines.alpha = 0;
+    if (__strumsDoAnimation) FlxTween.tween(__strumDrawnLines, {alpha: 0.25}, Conductor.crochet*0.001, {ease: FlxEase.circOut, startDelay: (Conductor.crochet * 0.001)*3});
+    else __strumDrawnLines.alpha = 0.25;
     __strumDrawnLines.onDraw = (spr) -> {
         if (!__strumDrawnLines.visible || !__strumDrawnLines.active || __strumDrawnLines.alpha <= 0.01) return;
         FlxSpriteUtil.fill(spr, 0x0);
@@ -79,6 +81,11 @@ function postCreate() {
 		FlxG.stage.quality = old;
 		spr.draw();
     };
+}
+
+var __strumsDoAnimation = false;
+function onStrumCreation(event) {
+    __strumsDoAnimation = event.__doAnimation;
 }
 
 // temporarally will only limit to 3 points, ill add more points later
