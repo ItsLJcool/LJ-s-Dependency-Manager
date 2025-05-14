@@ -1,0 +1,1 @@
+static var _useStrumPath:Bool = true;
