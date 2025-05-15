@@ -1,24 +1,9 @@
 //a
+
 if (!_useStrumPath) return disableScript();
 
-class BezierSegment {
-    public var start:FlxPoint;
-    public var control:FlxPoint;
-    public var end:FlxPoint;
-
-    public function new(?start:FlxPoint, ?control:FlxPoint, ?end:FlxPoint) {
-        this.start = start ?? FlxPoint.get(0, 1);
-        this.control = control ?? FlxPoint.get(0, 0);
-        this.end = end ?? FlxPoint.get(0, 1);
-    }
-
-    public function getPoint(t:Float):FlxPoint {
-        var u = 1 - t;
-        var x = (u * u) * start.x + 2 * u * t * control.x + (t * t) * end.x;
-        var y = (u * u) * start.y + 2 * u * t * control.y + (t * t) * end.y;
-        return FlxPoint.get(x, y);
-    }
-}
+import BezierSegment;
+import BezierSegments;
 
 import funkin.backend.scripting.events.CancellableEvent;
 import openfl.display.BitmapData;
@@ -31,7 +16,12 @@ import flixel.math.FlxPoint;
 var __strumDrawnLines = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, 0x00000000);
 function postCreate() {
     for (strumline in strumLines.members) {
-        for (strum in strumline.members) strum.extra.set("bezierSegment", new BezierSegment(FlxPoint.get(0, 1), FlxPoint.get(0, 1000*0.5), FlxPoint.get(0, 1000)));
+        for (strumIdx=>strum in strumline.members) {
+            strum.extra.set("bezierSegments", new BezierSegments([new BezierSegment(FlxPoint.get(0, 1), FlxPoint.get(0, 500), FlxPoint.get(0, 1000))]));
+            strum.extra.set("segments_speedMult", 1);
+            strum.extra.set("draw_arrowline", true);
+            PlayState.instance.scripts.call("onStrumPathGenerated", [strum]);
+        }
         strumline.onNoteUpdate.add(onNoteUpdate);
     }
 
@@ -49,30 +39,37 @@ function postCreate() {
         var whiteLineStyle = FlxSpriteUtil.getDefaultLineStyle({ thickness: 3.5, color: FlxColor.WHITE, });
         var thicknessLineStyle = FlxSpriteUtil.getDefaultLineStyle({ thickness: whiteLineStyle.thickness*3, color: FlxColor.BLACK, });
         FlxSpriteUtil.beginDraw(0x0, whiteLineStyle);
+
         var _drawing = false;
-        for (strumline in strumLines.members) {
+        for (_tempIdx=>strumline in strumLines.members) {
             if (!strumline.visible) continue;
             for (strum in strumline.members) {
-                if (!strum.extra.exists("bezierSegment")) continue;
+                if (!strum.extra.exists("bezierSegments")) continue;
+                if (strum.extra.exists("draw_arrowline") && !strum.extra.get("draw_arrowline")) continue;
                 _drawing = true;
 
-                var segment = strum.extra.get("bezierSegment");
-                var _x = strum.x + (strum.width*0.5);
-                var _y = strum.y + (strum.height*0.5);
-                
-                var _controlX = segment.control.x + _x;
-                var _controlY = segment.control.y + _y;
-                
-                var _endX = segment.end.x + _x;
-                var _endY = segment.end.y + _y;
+                var segments = strum.extra.get("bezierSegments");
+                for (segment in segments.segments) {
+                    var _x = strum.x + (strum.width*0.5);
+                    var _y = strum.y + (strum.height*0.5);
 
-                for (line in [thicknessLineStyle, whiteLineStyle]) {
-                    FlxSpriteUtil.setLineStyle(line);
-                    FlxSpriteUtil.flashGfx.moveTo(_x, _y);
-                    FlxSpriteUtil.flashGfx.curveTo(_controlX, _controlY, _endX, _endY);
+                    var _startX = segment.start.x + _x;
+                    var _startY = segment.start.y + _y;
+                    
+                    var _controlX = segment.control.x + _x;
+                    var _controlY = segment.control.y + _y;
+                    
+                    var _endX = segment.end.x + _x;
+                    var _endY = segment.end.y + _y;
 
-                    // FlxSpriteUtil.flashGfx.moveTo(_x, _y);
-                    // FlxSpriteUtil.flashGfx.lineTo(_x, -200);
+                    for (line in [thicknessLineStyle, whiteLineStyle]) {
+                        FlxSpriteUtil.setLineStyle(line);
+                        FlxSpriteUtil.flashGfx.moveTo(_startX, _startY);
+                        FlxSpriteUtil.flashGfx.curveTo(_controlX, _controlY, _endX, _endY);
+
+                        // FlxSpriteUtil.flashGfx.moveTo(_x, _y);
+                        // FlxSpriteUtil.flashGfx.lineTo(_x, -200);
+                    }
                 }
             }
         }
@@ -90,23 +87,25 @@ function onStrumCreation(event) {
 
 // temporarally will only limit to 3 points, ill add more points later
 function update(elapsed:Float) {
-    for (strumIDX=>strumline in strumLines.members) {
+    for (strumlineIdx=>strumline in strumLines.members) {
         if (!strumline.visible) continue;
-        for (strum in strumline.members) {
-            if (!strum.extra.exists("bezierSegment")) strum.extra.set("bezierSegment", new BezierSegment());
-            var segment = strum.extra.get("bezierSegment");
-            segment.start = FlxPoint.get(0, 1); // dont touch
-            segment.control = FlxPoint.get(0, 500);
-            segment.end = FlxPoint.get(0, 1000);
+        for (strumIdx=>strum in strumline.members) {
+            if (!strum.extra.exists("bezierSegments")) continue;
 
+            var segments = strum.extra.get("bezierSegments");
             var _event = new CancellableEvent();
             _event.data = {
-                segment: segment,
+                segments: segments,
                 strum: strum,
-                strumLine: strumline,
-            };
-            PlayState.instance.scripts.event("onStrumPathUpdate", _event);
+                _strumIdx: strumIdx,
 
+                strumLine: strumline,
+                _strumLineIdx: strumlineIdx,
+
+                _arrowlinesSprite: __strumDrawnLines,
+            };
+
+            PlayState.instance.scripts.event("onStrumPathUpdate", _event);
         }
     }
 }
@@ -115,10 +114,12 @@ function update(elapsed:Float) {
 
 function onNoteUpdate(event) {
     var daNote = event.note;
-    if (daNote == null) return;
-    event.cancelPositionUpdate();
-    if (!daNote.exists) return;
+    if (daNote == null || !daNote.exists) return;
+
     var strum = event.strum ?? daNote.__strum;
+
+    if (!strum.extra.exists("bezierSegments")) return;
+    event.cancelPositionUpdate();
 
     daNote.__strum = strum;
     if (strum.copyStrumCamera) daNote.__strumCameras = strum.lastDrawCameras;
@@ -131,7 +132,9 @@ function onNoteUpdate(event) {
     __updateNotePos(daNote, strum, event);
     for (field in strum.extraCopyFields) CoolUtil.cloneProperty(daNote, field, strum); // TODO: make this cached to reduce the reflection calls - Neo
 
-    if (daNote.isSustainNote) daNote.updateSustain(strum);
+    if (daNote.isSustainNote) {
+        daNote.updateSustain(strum);
+    }
 }
 
 var __test = new BezierSegment();
@@ -140,23 +143,25 @@ function __updateNotePos(daNote, strum, __event) {
     var shouldY = strum.updateNotesPosY && daNote.updateNotesPosY;
 
     if (!(shouldX || shouldY)) return;
+    var segments = strum.extra.get("bezierSegments");
+    var speedMult = (strum.extra.exists("segments_speedMult")) ? strum.extra.get("segments_speedMult") : 1;
 
-    var time = (daNote.strumTime - Conductor.songPosition) * (0.45 * CoolUtil.quantize(strum.getScrollSpeed(daNote), 100));
-    var percent = Math.min(1, Math.max(0, time*0.001));
+    var time = (daNote.strumTime - Conductor.songPosition);
+    time *= speedMult;
+    var scrollTime = time * (0.45 * CoolUtil.quantize(strum.getScrollSpeed(daNote), 100));
 
-    if (!strum.extra.exists("bezierSegment")) strum.extra.set("bezierSegment", new BezierSegment());
-    var segment = strum.extra.get("bezierSegment");
-
-    var currentPoint = segment.getPoint(percent);
+    segments.percent = Math.max(0, time*0.001);
+    
+    var currentPoint = segments.getPoint();
 
     if (shouldX) {
-        if (percent != 0) daNote.x = currentPoint.x + (strum.width - daNote.width) * 0.5;
+        if (segments.percent != 0) daNote.x = currentPoint.x + (strum.width - daNote.width) * 0.5;
         else daNote.x = (strum.width - daNote.width) * 0.5;
     }
 
     if (shouldY) {
-        if (percent != 0) daNote.y = currentPoint.y;
-        else daNote.y = time * (0.45 * CoolUtil.quantize(strum.getScrollSpeed(daNote), 100));
+        if (segments.percent != 0) daNote.y = currentPoint.y;
+        else daNote.y = scrollTime * (0.45 * CoolUtil.quantize(strum.getScrollSpeed(daNote), 100));
         if (daNote.isSustainNote) daNote.y += strum.N_WIDTHDIV2;
     }
 }
