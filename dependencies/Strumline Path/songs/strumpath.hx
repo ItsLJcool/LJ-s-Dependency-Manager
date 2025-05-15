@@ -48,8 +48,8 @@ function postCreate() {
                 if (strum.extra.exists("draw_arrowline") && !strum.extra.get("draw_arrowline")) continue;
                 _drawing = true;
 
-                var segments = strum.extra.get("bezierSegments");
-                for (segment in segments.segments) {
+                var segments = strum.extra.get("bezierSegments").segments.copy();
+                for (segment in segments) {
                     var _x = strum.x + (strum.width*0.5);
                     var _y = strum.y + (strum.height*0.5);
 
@@ -147,11 +147,11 @@ function __updateNotePos(daNote, strum, __event) {
     var speedMult = (strum.extra.exists("segments_speedMult")) ? strum.extra.get("segments_speedMult") : 1;
 
     var time = (daNote.strumTime - Conductor.songPosition);
-    time *= speedMult;
     var scrollTime = time * (0.45 * CoolUtil.quantize(strum.getScrollSpeed(daNote), 100));
 
-    segments.percent = Math.max(0, time*0.001);
+    time *= speedMult;
     
+    segments.percent = Math.max(0, time*0.001);
     var currentPoint = segments.getPoint();
 
     if (shouldX) {
@@ -162,7 +162,8 @@ function __updateNotePos(daNote, strum, __event) {
     if (shouldY) {
         if (segments.percent != 0) daNote.y = currentPoint.y;
         else daNote.y = scrollTime * (0.45 * CoolUtil.quantize(strum.getScrollSpeed(daNote), 100));
-        if (daNote.isSustainNote) daNote.y += strum.N_WIDTHDIV2;
+        
+        if (daNote.isSustainNote)daNote.y += strum.N_WIDTHDIV2;
     }
 }
 

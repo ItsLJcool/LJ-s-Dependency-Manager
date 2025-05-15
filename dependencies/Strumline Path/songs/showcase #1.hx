@@ -1,4 +1,6 @@
 //a
+return disableScript();
+
 import BezierSegment;
 import BezierSegments;
 
